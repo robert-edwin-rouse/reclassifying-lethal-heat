@@ -69,7 +69,7 @@ python3 sensitivityanalysis.py
 python3 greedyforestbuilder.py
 ```
 
-Once the model has been trained, a new input dataframe, using compiler.py and then turned into dataframe of the same format using the LethalHeatClassifier class, can be fed into the model by using the LethalHeatClassifier.predict() method to create predictions for future events.
+Once the model has been trained and saved, a new input csv, created using compiler.py, can be passed the loaded model and normalisation data, if used during training, to create predictions for future events as per the example in userexample.py.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

@@ -1,5 +1,7 @@
 """
-
+This script contains the classes for the dataset handling and model architecture
+upon which all of the experiments in the Reclassifying Lethal Heat paper are
+based.
 """
 
 import numpy as np
@@ -26,13 +28,13 @@ def temporal_split(data: pd.DataFrame, label_column: str, label: int,
     data : pd.DataFrame
         Dataset to be split.
     label_column : str
-        Name of the .
+        Name of the column to create a sorted subset of the data.
     label : int
-        DESCRIPTION.
+        Label with which to subset the data.
     date_column : str
-        Name of the datetime column.
+        Name of the date, or other split point, column.
     split_point : float
-        Proportion of the data to be .
+        Proportion of the data to be split.
 
     Returns
     -------
@@ -46,26 +48,33 @@ def temporal_split(data: pd.DataFrame, label_column: str, label: int,
 
 class LethalHeatData:
     '''
-    
+    This class creates is used to create a preprocessed dataframe of lethal
+    and nonlethal heatwaves in preparation for use with a machine learning
+    classification algorithm.
     '''
     def __init__(self, heat_file: Path, features: list, target: list,
                  label_column: str, date_column: str, set_split: list):
         '''
+        Creates a lethal heatwave dataframe to be used by the classification
+        algorithm.
         
         Parameters
         ----------
         heat_file : Path
-            DESCRIPTION.
+            Filepath to the heatwave dataset, stored as a csv file.
         features : list
-            DESCRIPTION.
+            List of input features to be used.
         target : list
-            DESCRIPTION.
+            List of length 1 of the target variable being mapped to.
         label_column : str
-            DESCRIPTION.
+            Name of the target variable column if different from target.
         date_column : str
-            DESCRIPTION.
+            Name of the date column in the csv file.
         set_split : list
-            DESCRIPTION.
+            Desired splits for the dataset that takes two values: the first
+            is the proportion of data in the training set, the second is
+            the proportion of data in the validation set.  The remaining
+            data will form the test set.
 
         Returns
         -------
@@ -82,15 +91,15 @@ class LethalHeatData:
     
     def convert_datetime(self, column: str):
         '''
-        
+        Converts a pandas column to a standard datetime format.
         Parameters
         ----------
-        column : TYPE
-            DESCRIPTION.
+        column : str
+            Name of the column to be converted.
 
         Returns
         -------
-        None.
+        Overwrites the original column with the converted one in the dataframe.
         '''
         self.data[column] = pd.to_datetime(self.data[column],
                                            format='%Y-%m-%d').dt.date
@@ -98,28 +107,35 @@ class LethalHeatData:
     def data_splitter(self, label_column: str, date_column: str,
                       set_split: list, random_state: int=42):
         '''
-
+        Creates a regional chronological split in the data to minimise temporal
+        leakage.
+        
         Parameters
         ----------
         label_column : str
-            DESCRIPTION.
+            Name of the target variable column in the csv file.
         date_column : str
-            DESCRIPTION.
+            Name of the date column in the csv file.
         set_split : list
-            DESCRIPTION.
+            Desired splits for the dataset that takes two values: the first
+            is the proportion of data in the training set, the second is
+            the proportion of data in the validation set.  The remaining
+            data will form the test set.
         random_state : int, optional
-            DESCRIPTION. The default is 42.
+            Random seed for reproducibility of the split into the training
+            and validation data sets. The default is 42.
 
         Returns
         -------
-        train_data : TYPE
-            DESCRIPTION.
-        val_data : TYPE
-            DESCRIPTION.
-        test_data : TYPE
-            DESCRIPTION.
-        date_splits : TYPE
-            DESCRIPTION.
+        train_data : pd.DataFrame
+            Dataframe of the training data.
+        val_data : pd.DataFrame
+            Dataframe of the validation data.
+        test_data : pd.DataFrame
+            Dataframe of the test data.
+        date_splits : dict
+            Dictionary of regions along with their respective date about which
+            the data is split into the training and test sets.
         '''
         self.convert_datetime(date_column)
         data_subset = pd.DataFrame(columns=self.data.columns)
@@ -143,11 +159,14 @@ class LethalHeatData:
     
     def process(self, normalise: bool=True):
         '''
+        Preprocesses the data and splits it into training, validation, and test
+        sets accordingly.  Normalises the data if normalisation is required.
         
         Parameters
         ----------
         normalise : bool, optional
-            DESCRIPTION. The default is True.
+            Whether or not to normalise the input features of the dataset using
+            the training data only. The default is True.
 
         Returns
         -------
@@ -161,6 +180,7 @@ class LethalHeatData:
             for f in self.features:
                 self.train_data[f] = ma.normalise(self.train_data, f,
                                                   norm_cache, write_cache=True)
+                self.norm_cache = norm_cache
                 self.val_data[f] = ma.normalise(self.val_data, f,
                                                 norm_cache, write_cache=False)
                 self.test_data[f] = ma.normalise(self.test_data, f,
@@ -168,18 +188,25 @@ class LethalHeatData:
 
     def downsample(self, subset: pd.DataFrame, downsample_frac: float=1):
         '''
-        
+        Downsamples a dataset based on reducing the number of majority,
+        nonlethal heatwave events.
+
         Parameters
         ----------
-        subset : TYPE
-            DESCRIPTION.
+        subset : pd.DataFrame
+            The dataset to be downsampled.
         downsample_frac : float, optional
-            DESCRIPTION. The default is 1.
+            The reduction factor to be applied when downsampling. The default
+            is 1.
 
         Returns
         -------
-        TYPE
-            DESCRIPTION.
+        pd.DataFrame
+            The downsampled dataset.
+        int
+            The number of positive, lethal events in the dataset.
+        int
+            The number of negative, nonlethal events in the dataset.
         '''
         positives = subset[subset[self.target] == 1]
         negatives = subset[subset[self.target] == 0].sample(frac=downsample_frac)
@@ -188,18 +215,20 @@ class LethalHeatData:
 
     def to_arrays(self, subset: pd.DataFrame):
         '''
+        Generates input and output data arrays from a pandas dataframe for use
+        with a classification algorithm.
         
         Parameters
         ----------
-        subset : TYPE
-            DESCRIPTION.
+        subset : pd.DataFrame
+            Pandas dataframe to be split into input and output data arrays.
 
         Returns
         -------
-        x_array : TYPE
-            DESCRIPTION.
-        y_array : TYPE
-            DESCRIPTION.
+        x_array : np.array
+            Array of model input values.
+        y_array : np.array
+            Array of model output values.
         '''
         array = subset.to_numpy()
         x_array = array[:,self.xspace].reshape(len(array),
@@ -211,7 +240,14 @@ class LethalHeatData:
 
 class LethalHeatClassifier:
     '''
-    
+    Class to specify, train, and evaluate a random forest architecture using
+    probabilistic Platt scaling.  Uses the LethalHeatData class to subset and
+    transform the input-output data pairs according to a desired temporal data
+    split.  Also takes advantage of functions to determine whether or not the
+    model is being used for validation or testing, and to either downsample or
+    upsample the data using synthetic data generation.  For further information 
+    on standard functions taken from the scikit learn library, please refer to
+    https://scikit-learn.org/stable/user_guide.html
     '''
     def __init__(self, heat_file: Path, features: list, target: list,
                  class_weights: dict, n_trees: int, tree_depth: int,
@@ -220,39 +256,50 @@ class LethalHeatClassifier:
                  downsample_frac:float=1, synthetic: bool=False,
                  validate: bool=False, normalise: bool=True):
         '''
+        Initialises the random forest classifier and prepares all data for
+        training.
         
         Parameters
         ----------
         heat_file : Path
-            DESCRIPTION.
+            Filepath to the heatwave dataset, stored as a csv file.
         features : list
-            DESCRIPTION.
+            List of input features to be used.
         target : list
-            DESCRIPTION.
+            List of length 1 of the target variable being mapped to.
         class_weights : dict
-            DESCRIPTION.
+            Dictionary of weights to apply to the lethal and nonlethal
+            classes.
         n_trees : int
-            DESCRIPTION.
+            Number of decision trees to use in the random forest.
         tree_depth : int
-            DESCRIPTION.
+            Maximum tree depth that the decision trees can grow to.
         date_column : str
-            DESCRIPTION.
+            Name of the date column in the csv file.
         set_split : list
-            DESCRIPTION.
+            Desired splits for the dataset that takes two values: the first
+            is the proportion of data in the training set, the second is
+            the proportion of data in the validation set.  The remaining
+            data will form the test set.
         random_state : int
-            DESCRIPTION.
+            Random state for reproducibility.
         n_neighbors : int
-            DESCRIPTION.
+            Number of existing examples to use to generate each new synthetic
+            data point.
         platt_method : str
-            DESCRIPTION.
+            Platt scaling method to be used for the classifier calibration.
         downsample : bool, optional
-            DESCRIPTION. The default is False.
+            Whether or not to downsample the majority, nonlethal class. The
+            default is False.
         downsample_frac : float, optional
-            DESCRIPTION. The default is 1.
+            The reduction factor to be applied when downsampling. The default
+            is 1.
         synthetic : bool, optional
-            DESCRIPTION. The default is False.
+            Whether or not to upsample the minority, lethal class using
+            synthetic minority oversampling. The default is False.
         validate : bool, optional
-            DESCRIPTION. The default is False.
+            Whether or not the model is being used on the test set or the is
+            being tuned using the validation set. The default is False.
 
         Returns
         -------
@@ -310,16 +357,19 @@ class LethalHeatClassifier:
     
     def train(self, processors: int):
         '''
+        Trains the random forest model.  Refer to the scikit learn
+        documentation for further information.
         
         Parameters
         ----------
-        processors : TYPE
-            DESCRIPTION.
+        processors : int
+            Number of processors that can be used for training.
 
         Returns
         -------
-        platt_model : TYPE
-            DESCRIPTION.
+        platt_model : CalibratedClassifierCV
+            A Platt scaled random forest model that outputs probabilistic
+            predictions of lethal/nonlethal class labels.
         '''
         platt_model = CalibratedClassifierCV(self.model, method=self.platt_method,
                                              n_jobs=processors)
@@ -329,15 +379,21 @@ class LethalHeatClassifier:
     def predict(self, subset: pd.DataFrame,
                 trained_model: sle.RandomForestClassifier, threshold: float):
         '''
+        Creates predictions of class labels using a probability threshold for
+        Platt scaling of either lethal or nonlethal.  Also generates standard
+        consensus predictions.  Values are added to the subset dataframe.
+        Refer to the scikit learn documentation for further information.
+        
         
         Parameters
         ----------
-        subset : TYPE
-            DESCRIPTION.
-        trained_model : TYPE
-            DESCRIPTION.
+        subset : pd.DataFrame
+            Subset of a dataframe upon which to make the prediction, such as
+            the test subset from the whole dataset.
+        trained_model : sle.RandomForestClassifier
+            The trained random forest model.
         threshold : float
-            DESCRIPTION.
+            Probability threshold between 0 and 1.
 
         Returns
         -------
@@ -352,13 +408,17 @@ class LethalHeatClassifier:
     def predict_all(self, trained_model: sle.RandomForestClassifier,
                     threshold: float):
         '''
+        Generates predictions for all datapoints, including the training set,
+        according to a given probability threshold.  Values are added to the
+        subset dataframe.  Refer to the scikit learn documentation for further
+        information.  
         
         Parameters
         ----------
-        trained_model : TYPE
-            DESCRIPTION.
+        trained_model : sle.RandomForestClassifier
+            The trained random forest model.
         threshold : float
-            DESCRIPTION.
+            Probability threshold between 0 and 1.
 
         Returns
         -------
@@ -373,22 +433,25 @@ class LethalHeatClassifier:
     
     def evaluate(self, subset: pd.DataFrame):
         '''
+        Evaluates the performance of the model on a given subset of the data
+        using standard classification metrics.
         
         Parameters
         ----------
-        subset : TYPE
-            DESCRIPTION.
+        subset : pd.DataFrame
+            Subset of the data upon which to evaluate the performance of the
+            classifier.
 
         Returns
         -------
-        accuracy : TYPE
-            DESCRIPTION.
-        precision : TYPE
-            DESCRIPTION.
-        recall : TYPE
-            DESCRIPTION.
-        f1score : TYPE
-            DESCRIPTION.
+        accuracy : float
+            Accuracy.
+        precision : float
+            Precision.
+        recall : float
+            Recall.
+        f1score : float
+            F1 score.
         '''
         accuracy = slm.accuracy_score(subset[self.target].astype(int), 
                                       subset['Predicted'])
@@ -405,11 +468,13 @@ class LethalHeatClassifier:
     
     def print_metrics(self, subset: pd.DataFrame):
         '''
+        Prints the output statistics used for classification to the console.
         
         Parameters
         ----------
-        subset : TYPE
-            DESCRIPTION.
+        subset : pd.DataFrame
+            Subset of a dataframe upon which to make the assessment, such as
+            the test subset from the whole dataset.
 
         Returns
         -------
@@ -424,22 +489,26 @@ class LethalHeatClassifier:
 
     def model_output(self, threshold:float):
         '''
-
+        Uses the class prediction and evaluation methods to create predictions
+        of lethal/nonlethal labels for heatwaves and generate output
+        statistics, specifically accuracy, precision, recall, and f1 score.
+        Refer to the scikit learn documentation for further information.
+        
         Parameters
         ----------
         threshold : float
-            DESCRIPTION.
+            Probability threshold between 0 and 1.
 
         Returns
         -------
-        acc : TYPE
-            DESCRIPTION.
-        prec : TYPE
-            DESCRIPTION.
-        rec : TYPE
-            DESCRIPTION.
-        f1 : TYPE
-            DESCRIPTION.
+        acc : float
+            Accuracy.
+        prec : float
+            Precision.
+        rec : float
+            Recall.
+        f1 : float
+            F1 score.
 
         '''
         if self.validate == True:
@@ -454,18 +523,22 @@ class LethalHeatClassifier:
     
     def feature_permutation(self, metric: str='f1', repeats: int=8):
         '''
+        Performs feature permutation for the random forest classifier using
+        a given metric, such as f1 score.  Refer to the scikit learn
+        documentation for further information.
 
         Parameters
         ----------
         metric : str, optional
-            DESCRIPTION. The default is 'f1'.
+            The metric upon which impact is assessed. The default is 'f1'.
         repeats : int, optional
-            DESCRIPTION. The default is 8.
+            The number of repeats. The default is 8.
 
         Returns
         -------
-        TYPE
-            DESCRIPTION.
+        pd.Series
+            Series of feature permutation importances that uses the features
+            as an index.
         '''
         self.ranking = p_i(self.model, self.x_eval, self.y_eval, scoring=metric,
                            n_repeats=repeats, random_state=self.random_state)

@@ -10,6 +10,7 @@ import pandas as pd
 import visualisations as vi
 from apollo import mechanics as ma
 from classifier import LethalHeatClassifier as cl
+from joblib import dump
 
 
 '''
@@ -20,13 +21,13 @@ heatwave_data = config.lethal_heat_data
 target = config.target
 features = list(config.feature_dict.keys())
 params = config.ForestConfig()
-results_data = config.results_filepath
+config.results_filepath
 
 classifier = cl(heatwave_data, features, target, params.class_weights,
                 params.n_trees, params.tree_depth, params.date_column,
                 [params.train_split, params.val_split], params.random_seed,
-                params.n_neighbors, params.platt_method, downsample=True,
-                synthetic=True, validate=True)
+                params.n_neighbors, params.platt_method, downsample=False,
+                synthetic=True, validate=False)
 
 
 '''
@@ -51,6 +52,8 @@ Train the random forest, output model performance statistics.
 '''
 classifier.model = classifier.train(processors=3)
 classifier.model_output(threshold=0.6)
+dump(classifier.model, config.model_filepath)
+dump(classifier.data.norm_cache, config.model_dictpath)
 
 
 '''

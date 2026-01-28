@@ -1,8 +1,6 @@
 """
-Trains and tests the random forest model for classifying heatwaves as either
-lethal or nonlethal, using a precompiled database.
-
-@author: robertrouse
+This script contains a set of prewritten plotting functions to create all of
+the figures in the Reclassifying Lethal Heat paper.
 """
 
 import numpy as np
@@ -80,7 +78,7 @@ def wet_bulb_plot(path: str, df: pd.DataFrame, target: str, temp_var: str,
     ax.set_xlabel('Maximum Temperature (°C)')
     ax.set_ylabel('Relative Humidity (%)')
     ax.legend(loc="lower left")
-    plt.savefig(path, dpi=dpi)
+    plt.savefig(path, dpi=dpi, format='eps')
     plt.show()
 
 
@@ -115,7 +113,7 @@ def correlation_matrix(path: str, df: pd.DataFrame, features: list,
     fig, ax = plt.subplots(figsize=(16, 12))
     sn.heatmap(CM, vmin= -0.6, vmax=1.01, annot=True, cmap='flare', mask=mask)
     ax.set_xticklabels(labels, rotation=-45, ha='left')
-    plt.savefig(path, dpi=dpi, bbox_inches='tight')
+    plt.savefig(path, dpi=dpi, bbox_inches='tight', format='eps')
     plt.show()
 
 
@@ -170,7 +168,7 @@ def heat_bubble(path: str, df: pd.DataFrame, target: str, lons: list, lats: list
     gl.top_labels = False
     gl.right_labels = False
     ax.legend(*sc.legend_elements("sizes", num=num, func=g), labelspacing=2)
-    plt.savefig(path, dpi=dpi)
+    plt.savefig(path, dpi=dpi, format='eps')
     plt.show()
 
 
@@ -219,7 +217,7 @@ def sensitivity_bar(path:str, df: pd.DataFrame, features: list, labels: list,
     ax.set_yticklabels(labels)
     ax.set_xlabel(xlabel)
     ax.set_xlim(limits)
-    plt.savefig(path, dpi=dpi, bbox_inches='tight')
+    plt.savefig(path, dpi=dpi, bbox_inches='tight', format='eps')
     plt.show()
 
 
@@ -271,7 +269,7 @@ def grid_tuning_plot(path: str, df: pd.DataFrame, hyperparameter: str,
     ax.xaxis.set_major_locator(mtk.MaxNLocator(5))
     # ax.yaxis.set_major_locator(mtk.MaxNLocator(6))
     ax.legend(loc='lower right')
-    plt.savefig(path, dpi=dpi, bbox_inches='tight')
+    plt.savefig(path, dpi=dpi, bbox_inches='tight', format='eps')
     plt.show()
 
 
@@ -315,7 +313,7 @@ def regional_date_stack(path: str, date_dict: dict, plot_ratio: int,
     ax.set_xlabel('Date')
     ax.set_xlim([pd.Timestamp(1990, 1, 1), pd.Timestamp(2013, 12, 31)])
     ax.legend(loc='upper left', framealpha=1)
-    plt.savefig(path, dpi=dpi, bbox_inches='tight')
+    plt.savefig(path, dpi=dpi, bbox_inches='tight', format='eps')
     plt.show()
 
 
@@ -365,5 +363,5 @@ def feature_dists(path: str, df1: pd.DataFrame, df2: pd.DataFrame, names: list,
     plt.tight_layout()
     fig.text(-0.0125, 0.5, 'Density', va='center', ha='center', rotation='vertical')
     plt.legend(labels=names, loc="lower center", bbox_to_anchor=(-0.9, -0.7))
-    plt.savefig(path, dpi=dpi, bbox_inches='tight')
+    plt.savefig(path, dpi=dpi, bbox_inches='tight', format='eps')
     plt.show()
