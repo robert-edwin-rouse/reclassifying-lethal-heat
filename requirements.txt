@@ -1,0 +1,15 @@
+cartopy
+cdsapi
+country_converter
+geopandas
+geopy
+imblearn
+matplotlib
+numpy
+pandas
+requests
+scikit-learn
+scipy
+seaborn
+xarray
+
