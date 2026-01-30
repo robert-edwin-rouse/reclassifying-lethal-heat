@@ -55,7 +55,8 @@ def geolocate(latitude, longitude):
 
 def grid_square(lat, lon):
     """
-    Rounds up latitude and longitude point data to a 1° x 1° containing grid cell
+    Rounds up latitude and longitude point data to a 1° x 1° containing grid
+    cell.
 
     Parameters
     ----------
@@ -81,22 +82,21 @@ def grid_square(lat, lon):
 
 def fuzzy_match(x, scan_array, threshold=0.9):
     """
-    Matches 
+    Finds the closest match from an array to a given string.
 
     Parameters
     ----------
-    x : TYPE
-        DESCRIPTION.
-    scan_array : TYPE
-        DESCRIPTION.
-    threshold : TYPE, optional
-        DESCRIPTION. The default is 0.9.
+    x : string
+        String to match.
+    scan_array : numpy array
+        Array from which to find the matching value.
+    threshold : TYPE, float
+        Minimum likelihood to be exceeded by the match. The default is 0.9.
 
     Returns
     -------
-    TYPE
-        DESCRIPTION.
-
+    closest: string
+        Closest match to x.
     """
     aliases = difflib.get_close_matches(
         x, scan_array, len(scan_array), threshold)
@@ -131,21 +131,21 @@ def mixed_daily_resample(array):
 
 def time_boundaries(heatwave_start, window_lengths):
     """
-    Sets upper and lower temporal bounds for slicing meteorology
+    Sets upper and lower temporal bounds for slicing meteorology.
+    
     Parameters
     ----------
     heatwave_start : datetime.date
-        DESCRIPTION.
-    window_lengths : TYPE
-        DESCRIPTION.
+        Start date for the heatwave.
+    window_lengths : list
+        List of antecedent window lengths.
 
     Returns
     -------
-    lower_bounds : TYPE
-        DESCRIPTION.
-    upper_bound : TYPE
-        DESCRIPTION.
-        
+    lower_bounds : list of datetime.date
+        List of start dates for antecedent windows preceding a heatwave.
+    upper_bound : datetime.date
+        Day before the beginning of a heatwave.
     """
     lower_bounds = [heatwave_start -
                     dt.timedelta(days=x) for x in window_lengths]
@@ -153,55 +153,58 @@ def time_boundaries(heatwave_start, window_lengths):
     return lower_bounds, upper_bound
 
 
-def antecedent_adaptation(array, hw_start, years=10):
+def antecedent_adaptation(array, heatwave_start, window_length=30, years=10):
     """
-    
+    Calculates the average value for a meteorological variable for a given 
+    window of days before a heatwave start over a given number of years as
+    a proxy for seasonal adaptation.
 
     Parameters
     ----------
-    array : TYPE
-        DESCRIPTION.
-    hw_start : TYPE
-        DESCRIPTION.
-    years : TYPE, optional
-        DESCRIPTION. The default is 10.
+    array : xarray.dataset
+        Meteorological data from which to calculate the adapted variable.
+    heatwave_start : datetime.date
+        Heatwave start date.
+    window_length : int, optional
+        The number of days before the heatwave to consider as the local
+        seasonal window. The default is 30.
+    years : int, optional
+        The number of years over which adaptation is determined to have
+        occurred. The default is 10.
 
     Returns
     -------
-    average : TYPE
-        DESCRIPTION.
-
+    adaptive_average : float
+        Adaptive average value for the meterological variable.
     """
     cache = []
     for y in range(years):
-        past_end = hw_start - dt.timedelta(days=(365*y+1))
-        past_start = past_end - dt.timedelta(days=30)
+        past_end = heatwave_start - dt.timedelta(days=(365*y+1))
+        past_start = past_end - dt.timedelta(window_length)
         t = np.mean(array.sel(time=slice(past_start, past_end))).values.item()
         cache.append(t)
-    average = np.mean(cache)
-    return average
+    adaptive_average = np.mean(cache)
+    return adaptive_average
 
 
 def ERA5_single_retrieval(country, city, grid_square, year, pressure_level=1000):
     """
-    
+    Retrieves and downloads a single year's worth of heatwave meteorology data
+    for a given location.
 
     Parameters
     ----------
-    country : TYPE
-        DESCRIPTION.
-    city : TYPE
-        DESCRIPTION.
-    grid_square : TYPE
-        DESCRIPTION.
-    year : TYPE
-        DESCRIPTION.
-    pressure_level : TYPE, optional
-        DESCRIPTION. The default is 1000.
+    country : string
+        Heatwave country.
+    city : string
+        Heatwave city.
+    grid_square : list
+        List of containing grid square corner coordinates.
+    year_range : list
+        List of years.
+    pressure_level : int, optional
+        Desired pressure level. The default is 1000.
 
-    Returns
-    -------
-    None.
     """
     client = cdsapi.Client()
     era5_file = str(country) + "_" + str(city) + "_" + \
@@ -230,24 +233,21 @@ def ERA5_single_retrieval(country, city, grid_square, year, pressure_level=1000)
 
 def ERA5_combine(country, city, grid_square, year_range, pressure_level=1000):
     """
-    
+    Combines yearly era5 data into a single location file.
 
     Parameters
     ----------
-    country : TYPE
-        DESCRIPTION.
-    city : TYPE
-        DESCRIPTION.
-    grid_square : TYPE
-        DESCRIPTION.
-    year_range : TYPE
-        DESCRIPTION.
-    pressure_level : TYPE, optional
-        DESCRIPTION. The default is 1000.
-
-    Returns
-    -------
-    None.
+    country : string
+        Heatwave country.
+    city : string
+        Heatwave city.
+    grid_square : list
+        List of containing grid square corner coordinates.
+    year_range : list
+        List of years.
+    pressure_level : int, optional
+        Desired pressure level. The default is 1000.
+        
     """
     for year in year_range:
         era5_file = str(country) + "_" + str(city) + "_" + \
@@ -267,26 +267,23 @@ def ERA5_combine(country, city, grid_square, year_range, pressure_level=1000):
     era5_data.to_netcdf(path=era5_file_out)
 
 
-def ERA_download(country, city, grid_square, year_range, pressure_level=1000):
+def ERA_full_download(country, city, grid_square, year_range, pressure_level=1000):
     """
+    Downloads data for a given location from ERA5 using ERA5_single_retrieval,
+    year by year, and then combines it using ERA5_combine.
     
-
     Parameters
     ----------
-    country : TYPE
-        DESCRIPTION.
-    city : TYPE
-        DESCRIPTION.
-    grid_square : TYPE
-        DESCRIPTION.
-    year_range : TYPE
-        DESCRIPTION.
-    pressure_level : TYPE, optional
-        DESCRIPTION. The default is 1000.
-
-    Returns
-    -------
-    None.
+    country : string
+        Heatwave country.
+    city : string
+        Heatwave city.
+    grid_square : list
+        List of containing grid square corner coordinates.
+    year_range : list
+        List of years.
+    pressure_level : int, optional
+        Desired pressure level. The default is 1000.
 
     """
     era5_file = str(country) + "_" + str(city) + "era5heat.nc"
@@ -299,6 +296,53 @@ def ERA_download(country, city, grid_square, year_range, pressure_level=1000):
 
 
 def heatwave_parameter_extraction(country, city, lat, lon, start, end, windows):
+    """
+    Extracts heatwave meteorological features to be used as inputs for the
+    machine learning model.
+
+    Parameters
+    ----------
+    country : string
+        Heatwave country.
+    city : string
+        Heatwave city.
+    lat : float
+        Latitude of location.
+    lon : float
+        Longitude of location.
+    start : datetime.date
+        Start date for the heatwave.
+    end : datetime.date
+        End date for the heatwave.
+    window_lengths : list
+        List of antecedent window lengths.
+
+    Returns
+    -------
+    max_t : float
+        Maximum temperature during the heatwave.
+    mean_w : float
+        Mean windspeed during the heatwave.
+    mean_h : float
+        Mean humidity during the heatwave.
+    ante_30t : float
+        Temperature differential of the maximum over the previous 30 days.
+    ante_90t : float
+        Temperature differential of the maximum over the previous 90 days.
+    ante_180t : float
+        Temperature differential of the maximum over the previous 180 days.
+    ante_30h : float
+        Humidity differential of the heatwave mean over the previous 30 days.
+    ante_90h : float
+        Humidity differential of the heatwave mean over the previous 90 days.
+    ante_180h : float
+        Humidity differential of the heatwave mean over the previous 180 days.
+    adapt_t : float
+        Adaptive temperature.
+    adapt_h : float
+        Adaptive humidity.
+
+    """
     array = xr.open_dataset(str(country) + "_" + str(city) + "era5heat.nc")
     array = array.interp(coords={'longitude': lon, 'latitude': lat},
                          method='nearest')
@@ -307,37 +351,36 @@ def heatwave_parameter_extraction(country, city, lat, lon, start, end, windows):
     max_t = np.max(array.sel(time=slice(start, end)).temperature).values.item()
     mean_w = np.mean(array.sel(time=slice(start, end)).windspeed).values.item()
     mean_h = np.mean(array.sel(time=slice(start, end)).humidity).values.item()
-    ante_30t = np.mean(array.sel(time=slice(bounds[0][0],
+    ante_30t = max_t - np.mean(array.sel(time=slice(bounds[0][0],
                                             bounds[1])).temperature).values.item()
-    ante_90t = np.mean(array.sel(time=slice(bounds[0][1],
+    ante_90t = max_t - np.mean(array.sel(time=slice(bounds[0][1],
                                             bounds[1])).temperature).values.item()
-    ante_180t = np.mean(array.sel(time=slice(bounds[0][2],
+    ante_180t = max_t - np.mean(array.sel(time=slice(bounds[0][2],
                                              bounds[1])).temperature).values.item()
-    ante_30h = np.mean(array.sel(time=slice(bounds[0][0],
+    ante_30h = mean_h - np.mean(array.sel(time=slice(bounds[0][0],
                                             bounds[1])).humidity).values.item()
-    ante_90h = np.mean(array.sel(time=slice(bounds[0][1],
+    ante_90h = mean_h - np.mean(array.sel(time=slice(bounds[0][1],
                                             bounds[1])).humidity).values.item()
-    ante_180h = np.mean(array.sel(time=slice(bounds[0][2],
+    ante_180h = mean_h - np.mean(array.sel(time=slice(bounds[0][2],
                                              bounds[1])).humidity).values.item()
-    adapt_t = antecedent_adaptation(array.temperature, start, years=10)
-    adapt_h = antecedent_adaptation(array.humidity, start, years=10)
+    adapt_t = max_t - antecedent_adaptation(array.temperature, start, years=10)
+    adapt_h = mean_h - antecedent_adaptation(array.humidity, start, years=10)
     return max_t, mean_w, mean_h, ante_30t, ante_90t, ante_180t, ante_30h, ante_90h, ante_180h, adapt_t, adapt_h
 
 
 def remove_spaces(s):
     """
-    
+    Removes all spaces from a string.
 
     Parameters
     ----------
-    s : TYPE
-        DESCRIPTION.
+    s : string
+        String to remove spaces from.
 
     Returns
     -------
-    TYPE
-        DESCRIPTION.
-
+    s : string
+        String with removed spaces.
     """
     if isinstance(s, str):
         return s.strip().replace(' ', '')
@@ -346,20 +389,19 @@ def remove_spaces(s):
 
 def best_fit_slope(xs, ys):
     """
-    
+    Returns slope of a line fitted to a pair of x and y coordinate arrays.
 
     Parameters
     ----------
-    xs : TYPE
-        DESCRIPTION.
-    ys : TYPE
-        DESCRIPTION.
+    xs : numpy array
+        Array of x coordinates.
+    ys : numpy array
+        Array of y coordinates.
 
     Returns
     -------
-    m : TYPE
-        DESCRIPTION.
-
+    m : float
+        Line gradient.
     """
     m = (((np.mean(xs)*np.mean(ys)) - np.mean(xs*ys)) /
          ((np.mean(xs)*np.mean(xs)) - np.mean(xs*xs)))
@@ -368,20 +410,19 @@ def best_fit_slope(xs, ys):
 
 def avg(xs, ys):
     """
-    
+    Returns average of a weight array.
 
     Parameters
     ----------
-    xs : TYPE
-        DESCRIPTION.
-    ys : TYPE
-        DESCRIPTION.
+    xs : numpy array
+        Array of values to be averaged.
+    ys : numpy array
+        Array of weights.
 
     Returns
     -------
-    a : TYPE
-        DESCRIPTION.
-
+    a : float
+        Weighted average.
     """
     a = np.sum(xs*ys)/np.sum(xs)
     return a
@@ -405,11 +446,11 @@ coordinates['City'], coordinates['Country'] = zip(*coordinates.apply(lambda x: g
                                                                      axis=1))
 coordinates['Grid_Square'] = coordinates.apply(
     lambda x: grid_square(x['Latitude'], x['Longitude']), axis=1)
-coordinates.apply(lambda x: ERA_download(x['Country'],
-                                         x['City'],
-                                         x['Grid_Square'],
-                                         [x for x in range(1970, 2015)],
-                                         pressure_level=1000), axis=1)
+coordinates.apply(lambda x: ERA_full_download(x['Country'],
+                                              x['City'],
+                                              x['Grid_Square'],
+                                              [x for x in range(1970, 2015)],
+                                              pressure_level=1000), axis=1)
 df = pd.merge(df, coordinates, on=['Longitude', 'Latitude'])
 columns_retained = ['StartDate', 'EndDate', 'DocuMortHetWav', 'Latitude',
                     'Longitude', 'Grid_Square', 'City', 'Country']
